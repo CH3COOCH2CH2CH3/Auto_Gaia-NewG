@@ -1,0 +1,24 @@
+ONE-TIME SETUP
+==============
+1. Edit bootstrap.cmd:
+   GITHUB_OWNER=YOUR_GITHUB_USERNAME
+   GITHUB_REPO=education-deploy
+
+2. Push the repository to GitHub as a PUBLIC repository.
+
+ENDPOINT COMMAND
+================
+Replace YOUR_GITHUB_USERNAME below with the same GitHub username, then paste this
+single command into PowerShell or Windows Terminal on the endpoint:
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$u='https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/education-deploy/main/bootstrap.cmd?cb=' + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds();$b=Join-Path $env:TEMP 'Education-Bootstrap.cmd';Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $b;try{& $env:ComSpec /d /c ('"""' + $b + '"""');exit $LASTEXITCODE}finally{Remove-Item -LiteralPath $b -Force -ErrorAction SilentlyContinue}"
+
+WHAT IT DOES
+============
+- Downloads bootstrap.cmd.
+- bootstrap.cmd downloads release/version.json.
+- Downloads the current release/Deploy-Education.ps1.
+- Verifies SHA256.
+- Runs it with PowerShell execution-policy bypass for that process only.
+- Deploy-Education.ps1 handles NEWG / GAIA / BOTH.
+- On deployment failure, the PS1 remains under %TEMP%\EducationDeploy for debug.

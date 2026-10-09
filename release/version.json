@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "version": "1.0.0",
+  "build": "v6 - fixed-drive selection + multi-signal login readiness",
+  "script": "Deploy-Education.ps1",
+  "size": 70925,
+  "sha256": "C74085F6D27B9B5488CB14C0152FEA302D46DF7CBB48AC0970967FDDC0D2109B",
+  "publishedAt": "2026-10-08T22:50:00+07:00",
+  "ready": true
+}
