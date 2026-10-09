@@ -1,5 +1,4 @@
 release/Deploy-Education.ps1 -text
-
 bootstrap.cmd text eol=crlf
 tools/*.ps1 text eol=crlf
 *.json text eol=lf

@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "version": "1.0.0",
-  "build": "v6 - fixed-drive selection + multi-signal login readiness",
+  "version": "1.1.0",
+  "build": "v7 - direct mode credential handoff + v6 readiness",
   "script": "Deploy-Education.ps1",
-  "size": 70925,
-  "sha256": "C74085F6D27B9B5488CB14C0152FEA302D46DF7CBB48AC0970967FDDC0D2109B",
-  "publishedAt": "2026-10-08T22:50:00+07:00",
+  "size": 74130,
+  "sha256": "46DB18F218B8565A785B018E5473DDA07342B80F49AD88FE49C9F84F1D20154A",
+  "publishedAt": "2026-10-09T09:43:53+07:00",
   "ready": true
 }

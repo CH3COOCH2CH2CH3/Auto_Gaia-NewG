@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 # ============================================================
 # EDUCATION SOFTWARE DEPLOYMENT
 # Windows 10 / Windows 11
-# Build: v6 - fixed-drive selection + multi-signal login readiness
+# Build: v7 - direct mode credential handoff + v6 readiness
 #
 # IMPORTANT:
 # Replace the API key below before distributing this script.
@@ -72,6 +72,48 @@ function Convert-SecureToPlainText {
     }
     finally {
         [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Bstr)
+    }
+}
+
+function Get-ProcessEnvBase64Text {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $Encoded = [Environment]::GetEnvironmentVariable(
+        $Name,
+        [EnvironmentVariableTarget]::Process
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Encoded)) {
+        return $null
+    }
+
+    try {
+        $Bytes = [Convert]::FromBase64String($Encoded)
+        return [System.Text.Encoding]::UTF8.GetString($Bytes)
+    }
+    catch {
+        Stop-Deploy ("Invalid Base64 value in environment variable " + $Name + ".")
+    }
+}
+
+function Clear-AutomationEnvironment {
+    $Names = @(
+        "EDU_DEPLOY_MODE",
+        "EDU_NEWG_USERNAME_B64",
+        "EDU_NEWG_PASSWORD_B64",
+        "EDU_GAIA_USERNAME_B64",
+        "EDU_GAIA_PASSWORD_B64"
+    )
+
+    foreach ($Name in $Names) {
+        [Environment]::SetEnvironmentVariable(
+            $Name,
+            $null,
+            [EnvironmentVariableTarget]::Process
+        )
     }
 }
 
@@ -2210,61 +2252,140 @@ if (
     exit 1
 }
 
-Write-Host "Select software:"
-Write-Host ""
-Write-Host " 1. NEWG"
-Write-Host " 2. GAIA"
-Write-Host " 3. NEWG + GAIA"
-Write-Host ""
-
 $Choice = $null
-
-while ($Choice -notin @("1", "2", "3")) {
-    $Choice = Read-Host "Select [1-3]"
-}
-
 $NewGUsername = $null
 $NewGPassword = $null
 $GaiaUsername = $null
 $GaiaPassword = $null
 
-if ($Choice -in @("1", "3")) {
+$AutomationMode = [Environment]::GetEnvironmentVariable(
+    "EDU_DEPLOY_MODE",
+    [EnvironmentVariableTarget]::Process
+)
+
+$UseAutomation = -not [string]::IsNullOrWhiteSpace($AutomationMode)
+
+if ($UseAutomation) {
+    $NormalizedMode = $AutomationMode.Trim().ToUpperInvariant()
+
+    switch ($NormalizedMode) {
+        "NEWG" {
+            $Choice = "1"
+        }
+
+        "GAIA" {
+            $Choice = "2"
+        }
+
+        "BOTH" {
+            $Choice = "3"
+        }
+
+        "COMBINED" {
+            $Choice = "3"
+        }
+
+        default {
+            Clear-AutomationEnvironment
+            Stop-Deploy (
+                "Unsupported EDU_DEPLOY_MODE. Use NEWG, GAIA, BOTH, or COMBINED."
+            )
+        }
+    }
+
+    if ($Choice -in @("1", "3")) {
+        $NewGUsername = Get-ProcessEnvBase64Text `
+            -Name "EDU_NEWG_USERNAME_B64"
+
+        $NewGPassword = Get-ProcessEnvBase64Text `
+            -Name "EDU_NEWG_PASSWORD_B64"
+    }
+
+    if ($Choice -in @("2", "3")) {
+        $GaiaUsername = Get-ProcessEnvBase64Text `
+            -Name "EDU_GAIA_USERNAME_B64"
+
+        $GaiaPassword = Get-ProcessEnvBase64Text `
+            -Name "EDU_GAIA_PASSWORD_B64"
+    }
+
+    Clear-AutomationEnvironment
+
+    if (
+        $Choice -in @("1", "3") -and
+        (
+            [string]::IsNullOrWhiteSpace($NewGUsername) -or
+            [string]::IsNullOrEmpty($NewGPassword)
+        )
+    ) {
+        Stop-Deploy "NEWG automation credentials are missing."
+    }
+
+    if (
+        $Choice -in @("2", "3") -and
+        (
+            [string]::IsNullOrWhiteSpace($GaiaUsername) -or
+            [string]::IsNullOrEmpty($GaiaPassword)
+        )
+    ) {
+        Stop-Deploy "GAIA automation credentials are missing."
+    }
+
+    Write-Host "Automation handoff detected." -ForegroundColor Green
+    Write-Host ("Requested mode: " + $NormalizedMode) -ForegroundColor Cyan
+    Write-Host "Software selection and credential prompts will be skipped."
     Write-Host ""
-    Write-Host "NEWG credentials" -ForegroundColor Cyan
-
-    $NewGUsername = Read-Host "NEWG username"
-
-    if ([string]::IsNullOrWhiteSpace($NewGUsername)) {
-        Write-Host "[ERROR] NEWG username cannot be empty." -ForegroundColor Red
-        exit 1
-    }
-
-    $Secure = Read-Host "NEWG password" -AsSecureString
-    $NewGPassword = Convert-SecureToPlainText -SecureValue $Secure
-
-    if ([string]::IsNullOrEmpty($NewGPassword)) {
-        Write-Host "[ERROR] NEWG password cannot be empty." -ForegroundColor Red
-        exit 1
-    }
 }
-
-if ($Choice -in @("2", "3")) {
+else {
+    Write-Host "Select software:"
     Write-Host ""
-    Write-Host "GAIA credentials" -ForegroundColor Cyan
+    Write-Host " 1. NEWG"
+    Write-Host " 2. GAIA"
+    Write-Host " 3. NEWG + GAIA"
+    Write-Host ""
 
-    $GaiaUsername = Read-Host "GAIA username"
-
-    if ([string]::IsNullOrWhiteSpace($GaiaUsername)) {
-        Write-Host "[ERROR] GAIA username cannot be empty." -ForegroundColor Red
-        exit 1
+    while ($Choice -notin @("1", "2", "3")) {
+        $Choice = Read-Host "Select [1-3]"
     }
 
-    $Secure = Read-Host "GAIA password" -AsSecureString
-    $GaiaPassword = Convert-SecureToPlainText -SecureValue $Secure
+    if ($Choice -in @("1", "3")) {
+        Write-Host ""
+        Write-Host "NEWG credentials" -ForegroundColor Cyan
 
-    if ([string]::IsNullOrEmpty($GaiaPassword)) {
-        Write-Host "[ERROR] GAIA password cannot be empty." -ForegroundColor Red
-        exit 1
+        $NewGUsername = Read-Host "NEWG username"
+
+        if ([string]::IsNullOrWhiteSpace($NewGUsername)) {
+            Write-Host "[ERROR] NEWG username cannot be empty." -ForegroundColor Red
+            exit 1
+        }
+
+        $Secure = Read-Host "NEWG password" -AsSecureString
+        $NewGPassword = Convert-SecureToPlainText -SecureValue $Secure
+
+        if ([string]::IsNullOrEmpty($NewGPassword)) {
+            Write-Host "[ERROR] NEWG password cannot be empty." -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    if ($Choice -in @("2", "3")) {
+        Write-Host ""
+        Write-Host "GAIA credentials" -ForegroundColor Cyan
+
+        $GaiaUsername = Read-Host "GAIA username"
+
+        if ([string]::IsNullOrWhiteSpace($GaiaUsername)) {
+            Write-Host "[ERROR] GAIA username cannot be empty." -ForegroundColor Red
+            exit 1
+        }
+
+        $Secure = Read-Host "GAIA password" -AsSecureString
+        $GaiaPassword = Convert-SecureToPlainText -SecureValue $Secure
+
+        if ([string]::IsNullOrEmpty($GaiaPassword)) {
+            Write-Host "[ERROR] GAIA password cannot be empty." -ForegroundColor Red
+            exit 1
+        }
     }
 }
 
