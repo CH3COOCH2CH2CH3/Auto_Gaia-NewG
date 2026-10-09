@@ -55,7 +55,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
  "$ErrorActionPreference='Stop';" ^
  "$ProgressPreference='SilentlyContinue';" ^
  "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;" ^
- "$m=Get-Content -LiteralPath '%MANIFEST_PATH%' -Raw ^| ConvertFrom-Json;" ^
+ "$m=ConvertFrom-Json -InputObject (Get-Content -LiteralPath '%MANIFEST_PATH%' -Raw);" ^
  "if($m.schema -ne 1){throw 'Unsupported manifest schema.'};" ^
  "if($m.ready -ne $true){throw 'Release is not marked ready.'};" ^
  "$n=[IO.Path]::GetFileName([string]$m.script);" ^
