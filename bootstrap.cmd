@@ -6,8 +6,8 @@ rem ============================================================
 rem EDIT THESE TWO VALUES ONCE BEFORE PUSHING THIS REPOSITORY.
 rem The repository must be public for token-free endpoint access.
 rem ============================================================
-set "GITHUB_OWNER=YOUR_GITHUB_USERNAME"
-set "GITHUB_REPO=education-deploy"
+set "GITHUB_OWNER=CH3COOCH2CH2CH3"
+set "GITHUB_REPO=Auto_Gaia-NewG"
 set "GITHUB_BRANCH=main"
 
 if /I "%GITHUB_OWNER%"=="YOUR_GITHUB_USERNAME" (
