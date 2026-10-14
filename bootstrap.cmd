@@ -36,9 +36,16 @@ echo [1/4] Downloading release manifest...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
  "$ErrorActionPreference='Stop';" ^
  "$ProgressPreference='SilentlyContinue';" ^
- "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;" ^
  "$u='%RAW_BASE%/release/version.json?cb=' + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds();" ^
- "Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile '%MANIFEST_PATH%'"
+ "$curl=Get-Command curl.exe -ErrorAction SilentlyContinue;" ^
+ "if($curl){" ^
+ "  Remove-Item -LiteralPath '%MANIFEST_PATH%' -Force -ErrorAction SilentlyContinue;" ^
+ "  & $curl.Source --location --fail --silent --show-error --retry 3 --retry-delay 2 --connect-timeout 15 --output '%MANIFEST_PATH%' $u;" ^
+ "  if($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath '%MANIFEST_PATH%')){throw ('curl.exe failed to download version.json. Exit=' + $LASTEXITCODE)}" ^
+ "}else{" ^
+ "  [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;" ^
+ "  Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile '%MANIFEST_PATH%'" ^
+ "}"
 
 if errorlevel 1 (
     echo.
@@ -63,7 +70,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
  "$dest=Join-Path '%WORK_DIR%' $n;" ^
  "Remove-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue;" ^
  "$u='%RAW_BASE%/release/' + $n + '?cb=' + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds();" ^
- "Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $dest;" ^
+ "$curl=Get-Command curl.exe -ErrorAction SilentlyContinue;" ^
+ "if($curl){" ^
+ "  & $curl.Source --location --fail --silent --show-error --retry 3 --retry-delay 2 --connect-timeout 15 --output $dest $u;" ^
+ "  if($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $dest)){throw ('curl.exe failed to download deployment script. Exit=' + $LASTEXITCODE)}" ^
+ "}else{" ^
+ "  [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;" ^
+ "  Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $dest" ^
+ "};" ^
  "$actualSize=(Get-Item -LiteralPath $dest).Length;" ^
  "if($m.size -and $actualSize -ne [int64]$m.size){Remove-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue;throw ('File size mismatch. Expected ' + $m.size + ', got ' + $actualSize)};" ^
  "$actual=(Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash.ToUpperInvariant();" ^
